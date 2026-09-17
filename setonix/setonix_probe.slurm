@@ -5,8 +5,10 @@
 #
 #   sbatch --account=<pawsey-project> setonix_probe.slurm
 #
-# Set HOST_LIB to whatever the login-node search actually found before running
-# the second variant (see the README in this directory).
+# HOST_LIB is a directory holding ONLY liblustreapi and its non-glibc
+# dependencies, prepared on a login node (see README). Binding the whole host
+# /usr/lib64 would put SLES glibc 2.31 ahead of the container's 2.39 and break
+# every binary before the test even starts.
 #
 #SBATCH --job-name=uw3_ioprobe
 #SBATCH --partition=work
@@ -25,7 +27,7 @@ module load singularity/4.1.0-mpi
 
 IMAGE=${IMAGE:-$MYSCRATCH/containers/setonix-ioprobe.sif}
 TARGET=${TARGET:-$MYSCRATCH/ioprobe/probe.bin}
-HOST_LIB=${HOST_LIB:-/usr/lib64}
+HOST_LIB=${HOST_LIB:-$MYSCRATCH/hostlib}
 
 mkdir -p "$(dirname "$TARGET")"
 
@@ -35,9 +37,9 @@ srun -n "$SLURM_NTASKS" singularity exec "$IMAGE" \
 echo "variant 1 exit: $?"
 
 echo
-echo "################ variant 2: host library tree bound ################"
-# Bound to a side path rather than over /usr/lib64, so the container's own
-# Ubuntu libraries keep priority and only the missing Lustre bits are added.
+echo "################ variant 2: liblustreapi bound in ################"
+[ -r "$HOST_LIB/liblustreapi.so.1" ] || { echo "no $HOST_LIB/liblustreapi.so.1 — prepare it first (README)"; exit 1; }
+ls -l "$HOST_LIB"
 srun -n "$SLURM_NTASKS" singularity exec \
     --bind "${HOST_LIB}:/host-lib" \
     "$IMAGE" \

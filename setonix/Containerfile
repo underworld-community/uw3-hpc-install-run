@@ -19,8 +19,11 @@
 #####################################################################
 
 # Pawsey's own MPICH base: Ubuntu 24.04 (glibc 2.39, so host Cray MPICH libs
-# bind-mount cleanly) with MPICH 4.2.2, ABI-compatible with Cray MPICH.
-FROM quay.io/pawsey/mpich-base:mpich4.2.2-ubuntu24.04
+# bind-mount cleanly). 3.4.3, not 4.2.2: Cray MPICH 8.1 is built on MPICH 3.4,
+# and anything compiled against 4.x headers references MPI-4 symbols
+# (MPI_Buffer_iflush) that the bind-mounted host libmpi lacks — ImportError
+# before the test starts. Same ABI (libmpi.so.12), older API surface.
+FROM quay.io/pawsey/mpich-base:3.4.3_ubuntu24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
