@@ -147,5 +147,20 @@ algorithm.
   v3.1.0.sif      -> (same)
   MANIFEST                      when, what, sha256, from where
   kaiju_container_job.sh        the template — copy it
-  kaiju_container_install.sh    admin: publish a new image (uw3admin group, no sudo)
+  kaiju_container_install.sh    admin: publish a new image
 ```
+
+## Updating the images (admin)
+
+Manual, on request, by a member of `uw3admin` — no sudo:
+
+```bash
+D=/opt/cluster/software/containers/underworld3
+$D/kaiju_container_install.sh v3.2.0      ghcr.io/underworldcode/underworld3-gadi:v3.2.0
+$D/kaiju_container_install.sh development ghcr.io/underworldcode/underworld3-gadi:development
+```
+
+Pulls, refuses an image where `import underworld3` fails, names the file by content,
+swaps the channel symlink atomically (running jobs keep their inode), appends to
+`MANIFEST`, keeps the last two per channel. A release also moves `latest.sif`. One-time
+setup is in the script header.
