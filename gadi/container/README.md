@@ -41,6 +41,30 @@ singularity pull docker://ghcr.io/underworldcode/underworld3-gadi:latest
 qsub -v SIF=$PWD/underworld3-gadi_latest.sif ... gadi_container_job.sh
 ```
 
+## Developing Underworld3 in the container
+
+Edit the source, build it *inside* the container on a login node (so the extensions link
+against its Python and PETSc), and put the result on scratch:
+
+```bash
+module load singularity
+SIF=/g/data/m18/software/containers/underworld3/development.sif
+singularity exec --bind ~/underworld3:/src $SIF bash -c \
+    "cd /src && SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0.dev0 \
+     pip install --no-build-isolation --target=/scratch/m18/$USER/uw3-editable ."
+```
+
+Then run with the normal template — `EXTRA_PKGS` is prepended to `PYTHONPATH`, so your
+build shadows the installed one:
+
+```bash
+qsub -v EXTRA_PKGS=/scratch/m18/$USER/uw3-editable,SCRIPT=/abs/path/model.py gadi_container_job.sh
+```
+
+Needs an image with a C++ compiler (`underworld3.ckdtree` is C++): check with
+`singularity exec $SIF rpm -q gcc-c++`. The image has no `git`, hence the pretend
+version. Changing PETSc itself is a bare-metal job.
+
 ## Shared images (admin)
 
 ```

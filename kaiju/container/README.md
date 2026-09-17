@@ -101,7 +101,8 @@ Python and PETSc), and put the result somewhere writable:
 ```bash
 mkdir -p /scratch/$USER/uw3-editable
 apptainer exec --bind ~/underworld3:/src --bind /scratch/$USER/uw3-editable:/editable \
-    $UW3_SIF bash -c "cd /src && pip install --no-build-isolation --target=/editable ."
+    $UW3_SIF bash -c "cd /src && SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0.dev0 \
+                      pip install --no-build-isolation --target=/editable ."
 
 APPTAINERENV_PYTHONPATH=/editable \
 srun --mpi=pmix -n 4 apptainer exec --bind /scratch/$USER/uw3-editable:/editable \
@@ -109,8 +110,8 @@ srun --mpi=pmix -n 4 apptainer exec --bind /scratch/$USER/uw3-editable:/editable
 ```
 
 Requires an image with a C++ compiler (`underworld3.ckdtree` is C++); check with
-`apptainer exec $UW3_SIF rpm -q gcc-c++`. If PETSc itself must change, that is a
-bare-metal job.
+`apptainer exec $UW3_SIF rpm -q gcc-c++`. The image has no `git`, hence the pretend
+version. If PETSc itself must change, that is a bare-metal job.
 
 ## Errors
 
