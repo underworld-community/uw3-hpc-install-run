@@ -1,0 +1,69 @@
+#!/bin/bash
+#
+# Which MPI transport does the UW3 container actually get on Gadi?
+#
+# Runs common/pingpong.py three ways, 2 ranks on 2 different nodes:
+#   A  bare metal        host openmpi/4.1.7            — the reference
+#   B  container, plain  container's own OpenMPI        — what the README currently says to do
+#   C  container, host-MPI injection (gadi_container_go.sh form)
+#
+# Two nodes is the minimum that says anything about the fabric; normal-queue
+# multi-node jobs must take whole nodes, hence ncpus=96 for a 2-rank test.
+#
+# Usage:  qsub gadi_pingpong_transports.pbs
+#         qsub -v SIF=/path/to/other.sif gadi_pingpong_transports.pbs
+
+#PBS -P m18
+#PBS -N uw3_pingpong
+#PBS -q normal
+#PBS -l walltime=00:15:00
+#PBS -l ncpus=96
+#PBS -l mem=190gb
+#PBS -l storage=gdata/m18+scratch/m18
+#PBS -l wd
+#PBS -j oe
+
+SIF=${SIF:-/g/data/m18/software/containers/underworld3-gadi_v3.1.0.sif}
+PINGPONG=${PINGPONG:-$PBS_O_WORKDIR/../common/pingpong.py}
+INSTALL_SCRIPT=/g/data/m18/software/uw3-pixi/gadi_install_shared.sh
+
+# A hung variant must not eat the others' walltime.
+T="timeout 240"
+# grep -a: the MPI warning banners contain bytes grep otherwise treats as binary,
+# and it then replaces the whole table with "Binary file matches".
+
+echo "Job:  $PBS_JOBID"
+echo "SIF:  $SIF  ($(readlink -f "$SIF"))"
+echo "Nodes:"; sort -u "$PBS_NODEFILE"
+echo
+
+echo "================ A: bare metal (openmpi/4.1.7) ================"
+( source "$INSTALL_SCRIPT" >/dev/null 2>&1
+  $T mpiexec -n 2 --map-by node python3 "$PINGPONG" ) 2>&1 | grep -a -v "mlx5_0\|OpenFabrics\|LOG_CAT_ML"
+echo "exit: ${PIPESTATUS[0]}"
+echo
+
+module purge
+module load singularity openmpi/4.1.7
+
+echo "================ B: container, plain ================"
+$T mpiexec -n 2 --map-by node singularity exec "$SIF" python3 "$PINGPONG" \
+    2>&1 | grep -a -v "mlx5_0\|OpenFabrics\|LOG_CAT_ML"
+echo "exit: ${PIPESTATUS[0]}"
+echo
+
+echo "================ C: container, host-MPI injection ================"
+# Same library chain as uw3-scaling-scripts/gadi_container_go.sh; /half-root is
+# where Gadi keeps the real system libs that /lib64 symlinks point at.
+HOST_LIBS=/apps/openmpi/4.1.7/lib:/apps/openmpi-mofed5.8-pbs2021.1/4.1.7/lib
+HOST_LIBS=$HOST_LIBS:/apps/ucx/1.17.0/lib:/apps/ucc/1.3.0/lib:/apps/hcoll/4.8.3228/lib
+HOST_LIBS=$HOST_LIBS:/opt/pbs/default/lib:/half-root/usr/lib64:/half-root/lib64
+$T mpiexec -n 2 --map-by node singularity exec \
+    --bind /half-root --bind /opt/pbs/default/lib "$SIF" \
+    bash -c "LD_LIBRARY_PATH=$HOST_LIBS:\$LD_LIBRARY_PATH python3 $PINGPONG" \
+    2>&1 | grep -a -v "mlx5_0\|OpenFabrics\|LOG_CAT_ML"
+echo "exit: ${PIPESTATUS[0]}"
+echo
+
+echo "================ what the container has ================"
+singularity exec "$SIF" bash -c 'ompi_info --version | head -1; ompi_info | grep -i "MCA pml\|MCA btl"; command -v ucx_info && ucx_info -d | grep -i "Transport:" | sort -u'

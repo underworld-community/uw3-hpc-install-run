@@ -1,0 +1,32 @@
+#%Module1.0
+##
+## Tombstone for the retired baremetal underworld3 install on Kaiju.
+##
+## Copy over each existing modulefile under /opt/cluster/modulefiles/underworld3/
+## so anyone loading an old name gets told where to go, rather than "Unable to
+## locate a modulefile".
+
+proc ModulesHelp { } {
+    puts stderr "The baremetal underworld3 install has been retired."
+    puts stderr ""
+    puts stderr "Use the container instead:"
+    puts stderr "  module load underworld3-container/release       # for publishable work"
+    puts stderr "  module load underworld3-container/development   # newest code"
+    puts stderr ""
+    puts stderr "Then:"
+    puts stderr "  srun --mpi=pmix -n 4 apptainer exec \$UW3_SIF python3 your_script.py"
+    puts stderr ""
+    puts stderr "The module sets the MPI settings Kaiju needs. User guide:"
+    puts stderr "  github.com/underworld-community/uw3-hpc-install-run -> kaiju/container/README.md"
+}
+
+module-whatis "RETIRED — use underworld3-container/release"
+
+puts stderr ""
+puts stderr "  underworld3/* (baremetal) is RETIRED."
+puts stderr "  Use:  module load underworld3-container/release"
+puts stderr ""
+
+# break makes the load fail, so the message above is not scrolled past by a
+# script that carries on and then fails confusingly later.
+break

@@ -1,0 +1,4 @@
+.DS_Store
+*.o[0-9]*
+*.out
+*.err

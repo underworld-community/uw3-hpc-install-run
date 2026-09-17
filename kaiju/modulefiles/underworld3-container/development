@@ -1,0 +1,57 @@
+#%Module1.0
+##
+## Underworld3 via Apptainer container
+## Shared SIF: /opt/cluster/software/containers/underworld3
+##
+## Usage: module load underworld3-container/development
+##
+## Admin: install/update with kaiju_container_install.sh. The MPI settings below
+## are load-bearing — see kaiju/container/FINDINGS.md before changing any of them.
+
+proc ModulesHelp { } {
+    puts stderr "Underworld3 geodynamics framework, run from a container."
+    puts stderr ""
+    puts stderr "Sets UW3_SIF and the MPI settings Kaiju requires."
+    puts stderr ""
+    puts stderr "To run:"
+    puts stderr "  srun --mpi=pmix -n 4 apptainer exec \$UW3_SIF python3 your_script.py"
+    puts stderr ""
+    puts stderr "UW3_SIF is a symlink that moves when the container is updated."
+    puts stderr "For a job that must record what it ran, resolve it first:"
+    puts stderr "  CONTAINER=\$(readlink -f \$UW3_SIF)"
+    puts stderr ""
+    puts stderr "To check the version you are about to run:"
+    puts stderr "  apptainer exec \$UW3_SIF python3 -c \"import underworld3 as uw; print(uw.__version__)\""
+    puts stderr ""
+    puts stderr "Note: Kaiju has no working RDMA path, so MPI runs over IPoIB."
+    puts stderr "Bandwidth is near line rate; latency is ~10x worse than RDMA."
+    puts stderr "Do not draw strong-scaling conclusions here — use Gadi for that."
+}
+
+module-whatis "Underworld3 geodynamics framework (container)"
+
+set base /opt/cluster/software/containers/underworld3
+
+setenv UW3_SIF $base/development.sif
+
+# APPTAINERENV_ prefix is required: a plain environment variable does not reach
+# the ranks inside the container.
+
+# ib0 not eno1: 33x bandwidth (3817 vs 117 MB/s measured, 2 ranks on 2 nodes).
+setenv APPTAINERENV_OMPI_MCA_btl_tcp_if_include ib0
+
+# openib is excluded deliberately. It delivers RDMA, but a background thread
+# segfaults at MPI_Finalize, so jobs exit nonzero after completing their work —
+# which breaks afterok dependency chains. UCX cannot substitute: it dropped
+# ConnectX-3 support before the 1.15 packaged here.
+setenv APPTAINERENV_OMPI_MCA_pml ob1
+setenv APPTAINERENV_OMPI_MCA_btl self,vader,tcp
+
+# Unprivileged Apptainer gives each rank its own user namespace, which breaks
+# CMA. Without this, ranks abort in PETSc's MatAssemblyEnd.
+setenv APPTAINERENV_OMPI_MCA_btl_vader_single_copy_mechanism none
+
+# PMIx cannot reach the server's shared-memory dstore across the container's
+# namespaces; hash is the working fallback. Cosmetic, but the errors it silences
+# would otherwise hide a real one.
+setenv APPTAINERENV_PMIX_MCA_gds hash

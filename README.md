@@ -1,90 +1,57 @@
-# uw3-hpc-baremetal-install-run
+# uw3-hpc-install-run
 
-Install and job scripts for running [Underworld3](https://github.com/underworldcode/underworld3) on HPC clusters using bare-metal MPI (system/spack OpenMPI) with [pixi](https://pixi.sh) for Python package management.
-
-## Clusters
-
-| Cluster | Scheduler | MPI | Python |
-|---------|-----------|-----|--------|
-| [NCI Gadi](gadi/) | PBS Pro | module `openmpi/4.1.7` | pixi `gadi` env |
-| [Kaiju](kaiju/) | Slurm | spack `openmpi@4.1.6` | pixi `kaiju` env |
-
-## Structure
-
-```
-gadi/
-  gadi_install_shared.sh    # shared install to /g/data/m18/software/ (admin only)
-  gadi_install_user.sh      # per-user install to /g/data/m18/$USER/
-  gadi_pbs_job.sh           # PBS job script template
-  gadi_test_stokes.py       # parallel Stokes flow test
-
-kaiju/
-  kaiju_install_shared.sh   # shared install (admin only)
-  kaiju_install_user.sh     # per-user install to ~/uw3-installation/
-  kaiju_slurm_job.sh        # Slurm job script template
-  kaiju_test_stokes.py      # parallel Stokes flow test
-```
-
-## Gadi
-
-### Submit a job
-
-> **Note:** `gadi_install_shared.sh` is already inside `/g/data/m18/software/uw3-pixi`. Pure users just need to edit the job script accordingly and submit the job.
-
-```bash
-# Edit gadi_pbs_job.sh to set your script, ncpus, walltime, then submit
-qsub gadi_pbs_job.sh
-```
-
-### Per-user install
-
-Copy `gadi_install_user.sh` to a convenient location, then:
-
-```bash
-# Install (first time only)
-source gadi_install_user.sh install
-
-# Activate in future sessions
-source gadi_install_user.sh
-```
-
-### Shared install (admin only)
-
-Copy `gadi_install_shared.sh` to a convenient location, then:
-
-```bash
-# Install (first time only)
-source gadi_install_shared.sh install
-```
+Running [Underworld3](https://github.com/underworldcode/underworld3) on our HPC clusters.
 
 ## Kaiju
 
-### Submit a job
-
-> **Note:** Pure users just need to do edit the job script accordingly and submit the job.
+Use the container:
 
 ```bash
-# Edit kaiju_slurm_job.sh to set your script, nodes, walltime, then submit
-sbatch kaiju_slurm_job.sh
+module load underworld3-container/release        # or /development for the newest code
+cp /opt/cluster/software/containers/underworld3/kaiju_container_job.sh .
+# edit SCRIPT=, --ntasks, --time, --mem
+sbatch kaiju_container_job.sh
 ```
 
-### Per-user install
+Jobs without `--mem` get ~2.6 GB per task, and Kaiju has no RDMA — do not benchmark on it.
+Guide: [kaiju/container/README.md](kaiju/container/README.md).
 
-Copy `kaiju_install_user.sh` to a convenient location, then:
+## Gadi
+
+Container (recommended) or bare metal; same performance. Edit `SCRIPT=` and the `#PBS`
+lines, then:
 
 ```bash
-# Install (first time only)
-source kaiju_install_user.sh install
-
-# Activate in future sessions
-source kaiju_install_user.sh
+qsub gadi/gadi_container_job.sh     # container, host MPI injected
+qsub gadi/gadi_pbs_job.sh           # bare metal, shared pixi install
 ```
 
-### Shared install (admin only)
+Keep the MPI injection in the container template: without it multi-node runs get half the
+bandwidth, or worse. Guide: [gadi/README.md](gadi/README.md).
 
-Copy `kaiju_install_shared.sh` to a convenient location, then:
+## Setonix
 
-```bash
-# Install shared environment and create module file (first time only)
-source kaiju_install_shared.sh install
+Nothing deployed — blocked on a Pawsey account and one experiment. See [setonix/](setonix/).
+
+---
+
+## About
+
+| Cluster | Scheduler | Container | Bare metal |
+|---|---|---|---|
+| Kaiju | Slurm | recommended | retired 2026-09-11 |
+| NCI Gadi | PBS Pro | recommended | supported |
+| Pawsey Setonix | Slurm | blocked | — |
+
+The Containerfiles and the CI that builds them live in the Underworld3 repo under
+`docs/developer/gadi_singularity/`. This repo is site operations: what to run where, and why.
+
+```
+kaiju/container/    user guide, job template, installer, FINDINGS.md
+kaiju/slurm/        memory enforcement / cgroup configuration
+kaiju/modulefiles/  underworld3-container/{development,release}; tombstone for the retired module
+kaiju/kaiju_*.sh    retired bare-metal scripts, kept as a record
+gadi/               job templates (container, bare metal), installers, FINDINGS.md
+setonix/            parallel-IO probe, not yet run
+common/             pingpong.py (is the container on the fabric?), sbatch_retry.sh
 ```
