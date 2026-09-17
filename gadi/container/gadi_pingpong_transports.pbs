@@ -24,7 +24,7 @@
 #PBS -j oe
 
 SIF=${SIF:-/g/data/m18/software/containers/underworld3-gadi_v3.1.0.sif}
-PINGPONG=${PINGPONG:-$PBS_O_WORKDIR/../common/pingpong.py}
+PINGPONG=${PINGPONG:-$PBS_O_WORKDIR/../../common/pingpong.py}
 INSTALL_SCRIPT=/g/data/m18/software/uw3-pixi/gadi_install_shared.sh
 
 # A hung variant must not eat the others' walltime.

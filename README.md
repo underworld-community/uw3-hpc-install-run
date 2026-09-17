@@ -22,8 +22,8 @@ Container (recommended) or bare metal; same performance. Edit `SCRIPT=` and the 
 lines, then:
 
 ```bash
-qsub gadi/gadi_container_job.sh     # container, host MPI injected
-qsub gadi/gadi_pbs_job.sh           # bare metal, shared pixi install
+qsub gadi/container/gadi_container_job.sh     # container, host MPI injected
+qsub gadi/baremetal/gadi_pbs_job.sh           # bare metal, shared pixi install
 ```
 
 Keep the MPI injection in the container template: without it multi-node runs get half the
@@ -50,8 +50,9 @@ The Containerfiles and the CI that builds them live in the Underworld3 repo unde
 kaiju/container/    user guide, job template, installer, FINDINGS.md
 kaiju/slurm/        memory enforcement / cgroup configuration
 kaiju/modulefiles/  underworld3-container/{development,release}; tombstone for the retired module
-kaiju/kaiju_*.sh    retired bare-metal scripts, kept as a record
-gadi/               job templates (container, bare metal), installers, FINDINGS.md
+kaiju/baremetal/    retired bare-metal scripts, kept as a record
+gadi/container/     user guide, job template, installer, FINDINGS.md
+gadi/baremetal/     pixi install scripts and PBS template
 setonix/            parallel-IO probe, not yet run
 common/             pingpong.py (is the container on the fabric?), sbatch_retry.sh
 ```

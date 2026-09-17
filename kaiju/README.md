@@ -17,5 +17,5 @@ srun --mpi=pmix -n 4 apptainer exec $UW3_SIF python3 your_script.py
 Two surprises: jobs without `--mem` get ~2.6 GB per task, and there is no RDMA, so timings
 here do not transfer to Gadi.
 
-`kaiju_install_*.sh` and `kaiju_slurm_job.sh` are the retired bare-metal scripts, kept as
-a record. `kaiju_test_stokes.py` is still the reference test.
+[baremetal/](baremetal/) holds the retired bare-metal scripts, kept as a record.
+`kaiju_test_stokes.py` stays here: it is the reference test for both.
