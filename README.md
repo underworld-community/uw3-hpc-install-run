@@ -31,7 +31,14 @@ bandwidth, or worse. Guide: [gadi/README.md](gadi/README.md).
 
 ## Setonix
 
-Nothing deployed — blocked on a Pawsey account and one experiment. See [setonix/](setonix/).
+Container, under the `-mpi` Singularity flavour. Edit `SCRIPT=` and the `#SBATCH` lines:
+
+```bash
+module load singularity/4.1.0-mpi
+sbatch --account=$PAWSEY_PROJECT setonix/container/setonix_container_job.slurm
+```
+
+Run from `$MYSCRATCH`, not `$HOME`. Guide: [setonix/container/README.md](setonix/container/README.md).
 
 ---
 
@@ -41,10 +48,10 @@ Nothing deployed — blocked on a Pawsey account and one experiment. See [setoni
 |---|---|---|---|
 | Kaiju | Slurm | recommended | retired 2026-09-11 |
 | NCI Gadi | PBS Pro | recommended | supported |
-| Pawsey Setonix | Slurm | blocked | — |
+| Pawsey Setonix | Slurm | recommended | — |
 
 The Containerfiles and the CI that builds them live in the Underworld3 repo under
-`docs/developer/gadi_singularity/`. This repo is site operations: what to run where, and why.
+`docs/developer/hpc_containers/`. This repo is site operations: what to run where, and why.
 
 ```
 kaiju/container/    user guide, job template, installer, FINDINGS.md
@@ -53,6 +60,7 @@ kaiju/modulefiles/  underworld3-container/{development,release}; tombstone for t
 kaiju/baremetal/    retired bare-metal scripts, kept as a record
 gadi/container/     user guide, job template, installer, FINDINGS.md
 gadi/baremetal/     pixi install scripts and PBS template
-setonix/            parallel-IO probe, not yet run
+setonix/container/  user guide, job template, FINDINGS.md
+setonix/probe/      the parallel-IO experiment that unblocked Setonix
 common/             pingpong.py (is the container on the fabric?), sbatch_retry.sh
 ```

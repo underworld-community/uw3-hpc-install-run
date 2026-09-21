@@ -20,7 +20,10 @@ CI-built image `ci-gadi-container` (job 178790720):
 | B container, plain | **11.8 us** | **3.2 GB/s** | container 4.1.1, **tcp** |
 | C container, host-MPI injection | 1.53 us | 13.6 GB/s | host 4.1.7, UCX |
 
-**Injected, the container is indistinguishable from bare metal** on both images, at every
+Refactored-layout image (`hpc_containers/`, job 179479794, 2026-09-21): A 1.44 us / 13.6 GB/s,
+B 2.20 us / 6.2 GB/s (`openib` this time), C 1.51 us / 13.6 GB/s — unchanged.
+
+**Injected, the container is indistinguishable from bare metal** on all images, at every
 message size. CI images are fit to publish. This is the form `gadi_container_go.sh` used
 throughout the scaling campaign.
 
