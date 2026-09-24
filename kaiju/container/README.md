@@ -95,19 +95,24 @@ stalls the chain. The job script's MPI settings exist partly to prevent that.
 
 ## Developing Underworld3 in the container
 
-Edit the source, build it *inside* the container (so the extensions link against its
-Python and PETSc), and put the result somewhere writable:
+Edit the source, build it *inside* the container on the login node (so the extensions
+link against its Python and PETSc), into a directory of your own:
 
 ```bash
-mkdir -p /scratch/$USER/uw3-editable
-apptainer exec --bind ~/underworld3:/src --bind /scratch/$USER/uw3-editable:/editable \
-    $UW3_SIF bash -c "cd /src && SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0.dev0 \
-                      pip install --no-build-isolation --target=/editable ."
-
-APPTAINERENV_PYTHONPATH=/editable \
-srun --mpi=pmix -n 4 apptainer exec --bind /scratch/$USER/uw3-editable:/editable \
-    $UW3_SIF python3 model.py
+module load underworld3-container/development
+apptainer exec $UW3_SIF bash -c "cd $HOME/underworld3 && SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0.dev0 \
+    pip install --no-build-isolation --target=$HOME/uw3-editable ."
 ```
+
+Then run with the normal job script. `EXTRA_PKGS` goes ahead of the image's own packages,
+so your build shadows the installed one:
+
+```bash
+sbatch --export=ALL,EXTRA_PKGS=$HOME/uw3-editable,SCRIPT=/abs/path/model.py kaiju_container_job.sh
+```
+
+Do not set `APPTAINERENV_PYTHONPATH` yourself: it replaces the image's path instead of
+adding to it, and petsc4py (in `/usr/local/lib`) stops importing.
 
 Requires an image with a C++ compiler (`underworld3.ckdtree` is C++); check with
 `apptainer exec $UW3_SIF rpm -q gcc-c++`. The image has no `git`, hence the pretend

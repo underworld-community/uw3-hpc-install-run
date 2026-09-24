@@ -7,6 +7,7 @@
 #   sbatch kaiju_container_job.sh
 #   sbatch --nodes=2 --ntasks-per-node=26 kaiju_container_job.sh
 #   sbatch --export=ALL,SCRIPT=/abs/path/model.py kaiju_container_job.sh
+#   sbatch --export=ALL,EXTRA_PKGS=$HOME/uw3-editable,SCRIPT=... kaiju_container_job.sh
 #
 # Every OMPI/PMIX setting below is load-bearing — see FINDINGS.md.
 #
@@ -25,9 +26,18 @@
 CONTAINER=${CONTAINER:-${UW3_SIF:-$HOME/containers/uw3-ci.sif}}
 CONTAINER=$(readlink -f "$CONTAINER")
 SCRIPT=${SCRIPT:-kaiju_test_stokes.py}
+# Extra packages, or a UW3 rebuilt in place (README), put ahead of the image's own.
+EXTRA_PKGS=${EXTRA_PKGS:-}
 
 [ -r "$CONTAINER" ] || { echo "container not readable: $CONTAINER" >&2; exit 1; }
 [ -r "$SCRIPT" ]    || { echo "script not readable: $SCRIPT" >&2; exit 1; }
+[ -z "$EXTRA_PKGS" ] || [ -d "$EXTRA_PKGS" ] || { echo "EXTRA_PKGS not a directory: $EXTRA_PKGS" >&2; exit 1; }
+
+# Bound to a fixed path so it works wherever it lives, and prepended inside the
+# container: APPTAINERENV_PYTHONPATH would replace the image's PYTHONPATH and
+# lose petsc4py, which lives in /usr/local/lib.
+BIND=()
+[ -n "$EXTRA_PKGS" ] && BIND=(--bind "$EXTRA_PKGS:/uw3-extra")
 
 # APPTAINERENV_ prefix is required — a plain export does not reach the ranks.
 export APPTAINERENV_OMPI_MCA_btl_tcp_if_include=ib0            # ib0 not eno1: 33x bandwidth
@@ -41,6 +51,7 @@ echo "Nodes:        ${SLURM_NODELIST}"
 echo "MPI ranks:    ${SLURM_NTASKS}"
 echo "Container:    ${CONTAINER}"
 echo "Script:       ${SCRIPT}"
+echo "Extra pkgs:   ${EXTRA_PKGS:-none}"
 echo ""
 
 # cgroup v1 has no peak-RSS counter — memory.max_usage_in_bytes is the peak of
@@ -61,7 +72,8 @@ RSSMAX=$(mktemp)
 sampler=$!
 trap 'kill $sampler 2>/dev/null; rm -f "$RSSMAX"' EXIT
 
-srun --mpi=pmix apptainer exec "${CONTAINER}" python3 "${SCRIPT}"
+srun --mpi=pmix apptainer exec "${BIND[@]}" "${CONTAINER}" \
+    bash -c "PYTHONPATH=${EXTRA_PKGS:+/uw3-extra:}\${PYTHONPATH} python3 \"${SCRIPT}\""
 rc=$?
 
 kill $sampler 2>/dev/null; wait $sampler 2>/dev/null
