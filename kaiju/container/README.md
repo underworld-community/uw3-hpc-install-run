@@ -39,7 +39,8 @@ the log records exactly what ran.
 ## The job script
 
 Edit `SCRIPT=` and the `#SBATCH` lines — `--ntasks` (MPI ranks), `--time`, and
-`--nodes`/`--ntasks-per-node` for placement (52 cores per node). Or override at submission:
+`--nodes`/`--ntasks-per-node` for placement (52 cores per node; Slurm counts hyperthreads and
+reports 104 CPUs, so `--ntasks-per-node=52` is one rank per core). Or override at submission:
 
 ```bash
 sbatch --ntasks=8 --time=02:00:00 --export=ALL,SCRIPT=/abs/path/model.py kaiju_container_job.sh
@@ -93,30 +94,75 @@ sbatch_chain step1.sh step2.sh step3.sh             # afterok chain; cancels all
 `afterok` releases the next job only on exit 0, so a job that segfaults on the way out
 stalls the chain. The job script's MPI settings exist partly to prevent that.
 
-## Developing Underworld3 in the container
+## Running a branch of Underworld3
 
-Edit the source, build it *inside* the container on the login node (so the extensions
-link against its Python and PETSc), into a directory of your own:
+Any branch whose PETSc matches the image can run without a new container: build it inside
+the image, on the login node, into a directory of your own, and the job script puts it
+ahead of the image's copy. Verified 2026-10-21 with `bugfix/backward-nodes-snapshot-order`:
+a 226 s build, then its tests passed serially and on 2 ranks across 2 nodes.
+
+**1. Get an image with a C++ compiler.** `underworld3.ckdtree` is C++. The shared images
+installed in 2026-09 predate `gcc-c++` in the runtime layer (added 2026-09-17), so until
+they are refreshed, pull the current image into your home. This needs no admin rights;
+it took 111 s and is 1.09 GB:
+
+```bash
+mkdir -p ~/uw3/images && cd ~/uw3/images
+apptainer pull --name uw3-gadi-development-$(date +%Y%m%d).sif \
+    docker://ghcr.io/underworldcode/underworld3-gadi:development
+apptainer exec uw3-gadi-development-*.sif rpm -q gcc-c++      # must not say "not installed"
+```
+
+**2. Build the branch into an overlay** (never `pip install -e`). The image has no `git`,
+hence the pretend version:
+
+```bash
+git clone https://github.com/underworldcode/underworld3 ~/uw3/src
+cd ~/uw3/src && git checkout <branch>
+apptainer exec ~/uw3/images/uw3-gadi-development-<date>.sif bash -c \
+    "cd ~/uw3/src && SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0.dev0 \
+     pip install --no-build-isolation --no-deps --target=$HOME/uw3/overlay-<branch> ."
+```
+
+`--no-deps` keeps pip from pulling anything into the overlay; a branch that needs a newer
+Python package than the image has will then fail at import, which is the signal to use a
+newer image rather than to add packages.
+
+**3. Run it** with the job script from this repository. The site copy in
+`/opt/cluster/software/containers/underworld3/` predates `EXTRA_PKGS`. Pass the image as
+`CONTAINER=`, which overrides `UW3_SIF` from the module. Load the module anyway for its MPI
+settings:
 
 ```bash
 module load underworld3-container/development
-apptainer exec $UW3_SIF bash -c "cd $HOME/underworld3 && SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0.dev0 \
-    pip install --no-build-isolation --target=$HOME/uw3-editable ."
+sbatch --export=ALL,CONTAINER=$HOME/uw3/images/uw3-gadi-development-<date>.sif,\
+EXTRA_PKGS=$HOME/uw3/overlay-<branch>,SCRIPT=/abs/path/model.py kaiju_container_job.sh
 ```
 
-Then run with the normal job script. `EXTRA_PKGS` goes ahead of the image's own packages,
-so your build shadows the installed one:
-
-```bash
-sbatch --export=ALL,EXTRA_PKGS=$HOME/uw3-editable,SCRIPT=/abs/path/model.py kaiju_container_job.sh
-```
+The job log's `Container:` line records what ran. To check that the overlay is in use,
+`python3 -c "import underworld3 as uw; print(uw.__file__)"` should print
+`/uw3-extra/underworld3/__init__.py`. To run a branch's tests, make `SCRIPT` a two-line
+file that calls `pytest.main(["tests/test_NNNN_name.py", "-q", "-p", "no:cacheprovider"])`
+from the checkout. (The 2026-10-21 runs used a pytest variant of the job script; this
+wrapper does the same job but has not been run on Kaiju yet.)
 
 Do not set `APPTAINERENV_PYTHONPATH` yourself: it replaces the image's path instead of
 adding to it, and petsc4py (in `/usr/local/lib`) stops importing.
 
-Requires an image with a C++ compiler (`underworld3.ckdtree` is C++); check with
-`apptainer exec $UW3_SIF rpm -q gcc-c++`. The image has no `git`, hence the pretend
-version. If PETSc itself must change, that is a bare-metal job.
+**If the branch needs a different PETSc** or new Python dependencies, build a branch image
+instead: the `GHCR: HPC Underworld3 images` workflow in `underworldcode/underworld3`
+(`hpc-uw3-image.yml`) takes `uw3_branch` and `image_tag` on a manual run and publishes
+`ghcr.io/underworldcode/underworld3-gadi:<tag>`, which you pull as in step 1.
+
+## Files and I/O
+
+- Submit from under your home directory. `/tmp` is node-local: a job submitted from
+  `/tmp` runs, but its output never reaches the login node.
+- `/home` lives on the login node and the compute nodes mount it over NFS, so all job I/O
+  goes through the login node (20 cores, 92 GB). Heavy checkpointing from several nodes at
+  once contends there. There is no scratch filesystem.
+- `/home` is a single disk on a single machine, not a backup: copy results that matter
+  elsewhere.
 
 ## Errors
 

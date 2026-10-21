@@ -126,3 +126,36 @@ works on running jobs only.
   so it stays comparable to the bare-metal reference.
 - `gamg` fallback RuntimeWarning (#625) — solver configuration. Real advice: build meshes
   with `refinement>=1` for production.
+
+## 2026-10-21: images, and a branch run from an overlay
+
+| Image | Source | `uw.__version__` | `gcc-c++` | Python / petsc4py |
+|---|---|---|---|---|
+| shared `development.sif` (2026-09-10) | `ghcr.io/jcgraciosa/underworld3-gadi:ci-gadi-container` | `0.0.0.dev0+g2bf3be8` | no | 3.12.14 / 3.25.0 |
+| shared `latest.sif` = `v3.1.0.sif` (2026-09-11) | `ghcr.io/jcgraciosa/underworld3-gadi:v3.1.0` | `0.99.0b` (source v3.1.0) | no | not checked |
+| personal pull, 2026-10-21 | `ghcr.io/underworldcode/underworld3-gadi:development` | `0.0.0.dev0+gf265817` | 8.5.0-29.el8_10 | 3.12.15 / 3.25.0 |
+
+The overlay build fails on the shared images at the first C++ extension:
+
+```
+building 'underworld3.ckdtree' extension
+The Open MPI wrapper compiler was unable to find the specified compiler g++ in your PATH.
+```
+
+On the newer image (same jobs, n5 and n6):
+
+| Job | Result | Wall |
+|---|---|---|
+| `kaiju_test_stokes.py`, 2 x 8 ranks | PASSED, SNES 10.7445 -> 3.12e-05 in 1 iteration (identical to the old image) | 15 s |
+| branch overlay, `test_1076`, 1 rank | 3 passed | 194 s |
+| branch overlay, `test_1076`, 2 ranks on 2 nodes | 3 passed | 137 s |
+
+Peak rss of the Stokes test fell from 2689 MB (old image) to 1374 MB. The MPI settings
+above work unchanged with the newer image.
+
+Other notes from the same session:
+
+- Running `apptainer exec` on the login node without the module's `OMPI_MCA_pml=ob1` prints
+  harmless OFI/mlx4 "UD QP" warnings.
+- Every rank tries a PostHog telemetry call and fails to resolve the host, because the compute
+  nodes have no outbound DNS. Harmless, but noisy.
