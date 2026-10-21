@@ -19,3 +19,16 @@ here do not transfer to Gadi.
 
 [baremetal/](baremetal/) holds the retired bare-metal scripts, kept as a record.
 `kaiju_test_stokes.py` stays here: it is the reference test for both.
+
+## Status (2026-10-21)
+
+- **n1-n4 are down** ("Not responding" since 2026-09-23), n3 among them, so
+  `--constraint=bigmem` cannot run. Add `--exclude='n[1-4]'` until they return.
+- **The shared images are stale.** `development.sif` (2026-09-10) and `v3.1.0.sif` were
+  pulled from a personal namespace (`ghcr.io/jcgraciosa/...`) and have no C++ compiler, so
+  the in-container rebuild fails. A `uw3admin` member should republish from
+  `ghcr.io/underworldcode/underworld3-gadi:{development,v3.2.0}` with
+  `kaiju_container_install.sh`. Until then, pull your own copy
+  ([container/README.md](container/README.md#running-a-branch-of-underworld3)).
+- **The site copy of `kaiju_container_job.sh` is older than the one here** and lacks
+  `EXTRA_PKGS`. Use this repository's copy.
